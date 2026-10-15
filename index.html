@@ -1,0 +1,1486 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Khawalid 20 Residential</title>
+
+    <link rel="stylesheet" href="css/styles.css" />
+
+    <!-- Al Maazar brand fonts — Outfit stands in for Garet (the brochure
+         body face, not on Google Fonts); Italiana for the thin titles.
+         Montserrat is the home-screen headline (as on the reference site),
+         Cairo its Arabic version. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Italiana&family=Montserrat:wght@300;400;600;800&family=Cairo:wght@400;600;800&display=swap" />
+    <!-- Project config: Supabase URL / key shared with admin/ and tools/ -->
+    <script src="config.js"></script>
+    <!-- The projects this site shows — map pins, scenes, floors, texts — and which one this page is about (?project=<id>) -->
+    <script src="projects.js"></script>
+
+    <!-- MapLibre GL (interactive globe + map) -->
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css"
+        integrity="sha256-qx5w1Z7EBGW65+cDDaLzzPKBM/1QLmK9WY7vut/XpzI=" crossorigin="" />
+</head>
+
+<body>
+    <!-- ============================================================
+         ORIENTATION CHOOSER + TOGGLE (small screens only)
+         These live OUTSIDE #appRoot so they stay upright in the real
+         viewport while the app inside #appRoot can be rotated 90deg.
+    ============================================================= -->
+    <div id="orientChooser" class="orient-chooser" role="dialog" aria-modal="true"
+        aria-label="Choose viewing orientation">
+        <h2>Choose your view</h2>
+        <p>
+            Pick the layout that fits your screen best. You can switch anytime with
+            the button in the top corner.
+        </p>
+        <div class="orient-options">
+            <button type="button" class="orient-opt" data-mode="portrait">
+                <span class="oi" aria-hidden="true"></span>
+                <b>Portrait</b>
+                <span>Hold phone upright</span>
+            </button>
+            <button type="button" class="orient-opt" data-mode="landscape">
+                <span class="oi" aria-hidden="true"></span>
+                <b>Landscape</b>
+                <span>Fills the screen sideways</span>
+            </button>
+        </div>
+    </div>
+
+    <button type="button" id="orientToggle" class="orient-toggle"
+        aria-label="Switch between landscape and portrait view">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12a9 9 0 0 1-9 9c-2.5 0-4.8-1-6.4-2.6" />
+            <path d="M3 12a9 9 0 0 1 9-9c2.5 0 4.8 1 6.4 2.6" />
+            <polyline points="18 1.6 18.5 5.6 14.5 6.1" />
+            <polyline points="6 22.4 5.5 18.4 9.5 17.9" />
+        </svg>
+        <span id="orientToggleLabel">Landscape</span>
+    </button>
+
+    <!-- Everything below rotates together when landscape mode is active -->
+    <div id="appRoot">
+        <!-- ============================================================
+         HOME SCREEN — the intro before the location map: looping video,
+         logo, headline and the EXPLORE button. The home-screen script near
+         the end of the body fills it from Supabase (admin → Home screen)
+         and hides it (.ih-off) when it is switched off there.
+    ============================================================= -->
+        <div id="introHero" class="intro-hero" aria-label="Welcome">
+            <div class="ih-media" id="ihMedia" aria-hidden="true">
+                <img id="ihPoster" alt="" draggable="false" hidden />
+                <video id="ihVideo" muted loop playsinline preload="auto" disablepictureinpicture></video>
+                <div class="ih-wash"></div>
+            </div>
+            <header class="ih-header">
+                <div class="ih-logo" id="ihLogo"><img id="ihLogoImg" alt="" draggable="false" /></div>
+                <button class="ih-lang" id="ihLang" type="button" aria-label="Switch language / تغيير اللغة">AR</button>
+            </header>
+            <div class="ih-content">
+                <div class="ih-row">
+                    <div class="ih-text">
+                        <div class="ih-logo-inline" id="ihLogoInline"><img id="ihLogoInlineImg" alt=""
+                                draggable="false" /></div>
+                        <div class="ih-cat"><i></i><span id="ihTagline"></span></div>
+                        <h1 class="ih-title"><span id="ihTitle1"></span><br /><span class="ih-accent"
+                                id="ihTitle2"></span></h1>
+                        <p class="ih-sub" id="ihSub"></p>
+                    </div>
+                    <div class="ih-cta"><button class="ih-btn" id="ihExplore" type="button">Explore</button></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ============================================================
+         LOCATION INTRO MAP — the screen after the home screen above.
+         A four-step journey on one map: Earth → Saudi Arabia → Riyadh →
+         Khawalid 20 (data-level 0…3, driven by the map script).
+    ============================================================= -->
+        <div id="locOverlay" data-level="0" aria-label="Khawalid 20 location map">
+            <!-- Space behind the globe (the map canvas is transparent around it) -->
+            <div class="loc-space" aria-hidden="true">
+                <canvas id="locStars"></canvas>
+                <div class="loc-sun"></div>
+            </div>
+
+            <div id="locMap"></div>
+            <div class="loc-flare" aria-hidden="true"></div>
+            <p class="loc-nomap-note">The interactive map could not load on this device.</p>
+
+            <div class="loc-header">
+                <div class="loc-head-left">
+                    <div class="loc-brand">
+                        <span class="brand-logo"><img src="01%20copy%20-%20Copy.png" alt="Khawalid"
+                                draggable="false" /></span>
+                    </div>
+                    <!-- Where am I / go back; the menu jumps straight to any step -->
+                    <div class="loc-nav" id="locNav">
+                        <button class="loc-nav-back" id="locBack" type="button" disabled>
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="M9 14 4 9l5-5" />
+                                <path d="M4 9h10a6 6 0 0 1 0 12h-3" />
+                            </svg>
+                            <span>Back</span>
+                        </button>
+                        <button class="loc-nav-cur" id="locLevelBtn" type="button" aria-haspopup="true"
+                            aria-expanded="false">
+                            <span id="locLevelName">Earth</span>
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                                <path d="m6 9 6 6 6-6" />
+                            </svg>
+                        </button>
+                        <ul class="loc-nav-menu" id="locLevelMenu"></ul>
+                    </div>
+                </div>
+                <div class="loc-head-right">
+                    <button class="loc-lang" id="locLang" type="button"
+                        aria-label="Switch language / تغيير اللغة">AR</button>
+                    <button class="loc-enter" id="locEnterBtn" type="button">
+                        <span>Explore the project</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M5 12h14M13 6l6 6-6 6" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <div class="loc-hint" id="locHint">Select Saudi Arabia to begin</div>
+
+            <!-- Right-edge controls: zoom in / back to this step's view / zoom out -->
+            <div class="loc-ctrls">
+                <button class="loc-ctrl loc-ctrl-zoom" id="locZoomIn" type="button" aria-label="Zoom in">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M12 5v14M5 12h14" />
+                    </svg>
+                </button>
+                <button class="loc-ctrl" id="locReset" type="button" aria-label="Reset view">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M3 12a9 9 0 1 0 3-6.7" />
+                        <path d="M3 3v5h5" />
+                    </svg>
+                </button>
+                <button class="loc-ctrl loc-ctrl-zoom" id="locZoomOut" type="button" aria-label="Zoom out">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <path d="M5 12h14" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Earth step: the gesture cue under the globe -->
+            <div class="loc-globe-foot" aria-hidden="true">
+                <div class="loc-gesture">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M19 12H5M11 6l-6 6 6 6" />
+                    </svg>
+                    <svg class="loc-hand" viewBox="0 0 24 24">
+                        <path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8" />
+                        <path
+                            d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+                    </svg>
+                    <svg viewBox="0 0 24 24">
+                        <path d="M5 12h14M13 6l6 6-6 6" />
+                    </svg>
+                </div>
+                <p>Drag to rotate</p>
+            </div>
+
+            <!-- Route info card: rendered as a map popup anchored to the
+           selected destination (see selectDest in the map script). -->
+
+            <!-- Proximity facts (static brochure numbers) -->
+            <div class="loc-prox" id="locProx" aria-label="Khawalid 20 proximity">
+                <div class="loc-prox-title">Minutes from everywhere</div>
+                <ul class="loc-prox-list">
+                    <li><span class="loc-prox-val">3 min</span> from Panorama Mall</li>
+                    <li><span class="loc-prox-val">5 min</span> from King Faisal Specialist Hospital</li>
+                    <li><span class="loc-prox-val">8 min</span> from Kingdom Centre</li>
+                    <li><span class="loc-prox-val">12 min</span> from the Diplomatic Quarter</li>
+                    <li><span class="loc-prox-val">30 min</span> from King Khalid Int&rsquo;l Airport</li>
+                </ul>
+            </div>
+
+            <!-- Map credits (the imagery and street data all ask for one) -->
+            <div class="loc-attrib">
+                Imagery &copy; <a href="https://www.esri.com/" target="_blank" rel="noopener">Esri</a> &middot;
+                <a href="https://earthdata.nasa.gov/gibs" target="_blank" rel="noopener">NASA Blue Marble</a> &middot;
+                <a href="https://openfreemap.org/" target="_blank" rel="noopener">OpenFreeMap</a>
+                <a href="https://www.openmaptiles.org/" target="_blank" rel="noopener">&copy; OpenMapTiles</a> &middot;
+                <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">&copy; OpenStreetMap
+                    contributors</a>
+            </div>
+        </div>
+
+        <!-- Main 360 images -->
+        <div id="frameViewer">
+            <img id="backgroundImage" src="" alt="360 frame" draggable="false" />
+
+            <!-- <video
+        id="frame30Video"
+        class="frame-video hidden"
+        muted
+        autoplay
+        loop
+        playsinline
+        preload="auto"
+      >
+        <source src="../magnific_p_2933752883.mp4" type="video/mp4" />
+      </video> -->
+
+            <!-- Three.js transparent layer: units + occluder -->
+            <div id="threeOverlay"></div>
+        </div>
+
+        <div id="mainLoader">
+            <div class="spinner"></div>
+            <p id="loadingText">Loading 0%</p>
+        </div>
+
+        <!-- Lightweight loader shown while a floor's low-res frames load -->
+        <div id="sceneLoader" class="scene-loader">
+            <div class="spinner"></div>
+            <p id="sceneLoaderText">Loading 0%</p>
+        </div>
+
+        <!-- Floor / scene menu (built in JS from SCENES) -->
+        <div id="floorMenu" class="floor-menu" aria-label="Floor navigation"></div>
+        <!-- A floor screen (ground / roof render) offers the way back to the building view it was opened from. -->
+        <button id="sceneBackBtn" class="scene-back-btn" type="button" hidden aria-label="Back to building"
+            title="Back to building"><span class="arrow" aria-hidden="true">←</span> <span>Back to
+                building</span></button>
+
+        <!-- Hide / show all 3D units -->
+        <button id="hideUnitsToggle" class="units-visibility-toggle" type="button" aria-label="Toggle units visibility">
+            <svg class="hu-ic hu-ic-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+                <circle cx="12" cy="12" r="3" />
+            </svg>
+            <svg class="hu-ic hu-ic-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+                <path d="M10.73 5.08A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a13.2 13.2 0 0 1-1.67 2.68" />
+                <path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.39-1.61" />
+                <line x1="2" y1="2" x2="22" y2="22" />
+            </svg>
+            <b>Hide Units</b>
+        </button>
+
+        <!-- Switch between the 360 photo orbit and the free-camera 3D model -->
+        <button id="mode3DToggle" class="units-visibility-toggle mode-3d-toggle" type="button"
+            aria-label="Toggle 3D view">
+            <svg class="hu-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 2 2 7l10 5 10-5-10-5Z" />
+                <path d="M2 17l10 5 10-5" />
+                <path d="M2 12l10 5 10-5" />
+            </svg>
+            <b>3D View</b>
+        </button>
+
+
+
+        <!-- Interactive layer appears after first 30 frames -->
+        <div id="interactiveContent" class="interactive-content hidden">
+            <!-- <div class="viewer">
+        <video
+          id="mainInteractiveVideo"
+          class="viewer-bg"
+          autoplay
+          muted
+          loop
+          playsinline
+        >
+          <source src="../magnific_p_2933752883.mp4" type="video/mp4" />
+        </video>
+
+        <div class="shade"></div>
+
+        <div class="topbar">
+          <span class="brand">ASWAQ</span>
+          <span class="hint">Hover floor / click to view units</span>
+        </div>
+
+        <svg
+          class="hotspot-svg"
+          viewBox="0 0 1920 1080"
+          preserveAspectRatio="none"
+        >
+          <polygon
+            class="floor-hotspot"
+            data-floor="LG"
+            data-title="Lower Ground"
+            data-video="videos/floor-lg.mp4"
+            points="690,780 1250,760 1300,850 650,880"
+          />
+          <polygon
+            class="floor-hotspot"
+            data-floor="GF"
+            data-title="Ground Floor"
+            data-video="videos/floor-gf.mp4"
+            points="660,680 1270,655 1300,745 670,770"
+          />
+          <polygon
+            class="floor-hotspot"
+            data-floor="1"
+            data-title="First Floor"
+            data-video="videos/floor-1.mp4"
+            points="700,575 1230,555 1260,638 685,660"
+          />
+          <polygon
+            class="floor-hotspot"
+            data-floor="2"
+            data-title="Second Floor"
+            data-video="videos/floor-2.mp4"
+            points="730,475 1205,455 1230,535 705,555"
+          />
+          <polygon
+            class="floor-hotspot"
+            data-floor="3"
+            data-title="Third Floor"
+            data-video="videos/floor-3.mp4"
+            points="760,370 1180,350 1200,435 735,455"
+          />
+          <polygon
+            class="floor-hotspot"
+            data-floor="RF"
+            data-title="Roof"
+            data-video="videos/floor-rf.mp4"
+            points="790,270 1160,250 1180,330 760,350"
+          />
+        </svg>
+
+        <div id="tooltip" class="tooltip"></div>
+      </div> -->
+
+            <div id="sheetLoading" class="loading">
+                <div class="spinner"></div>
+                <p>Loading sheet data...</p>
+            </div>
+
+            <div id="floorOverlay" class="overlay">
+                <div class="panel">
+                    <div class="panel-head">
+                        <div>
+                            <h2 id="floorTitle">Floor</h2>
+                            <p id="floorSub">Units loaded from Google Sheet</p>
+                        </div>
+                        <button class="close" id="closeFloor">×</button>
+                    </div>
+
+                    <div class="controls">
+                        <button class="pill available active" data-filter="available">
+                            Available
+                        </button>
+                        <button class="pill reserved active" data-filter="reserved">
+                            Reserved
+                        </button>
+                        <button class="pill sold active" data-filter="sold">Sold</button>
+                        <input id="unitSearch" class="search" placeholder="Search unit name..." />
+                    </div>
+
+                    <div class="panel-body">
+                        <div class="map-wrap">
+                            <div class="floor-map-stage" id="floorStage">
+                                <video id="floorVideo" class="floor-video" muted autoplay loop playsinline
+                                    preload="metadata"></video>
+
+                                <div id="videoFallback" class="video-fallback">
+                                    No video loaded for this floor. Check the data-video path.
+                                </div>
+
+                                <svg id="unitSvg" class="unit-svg" viewBox="0 0 1000 650"
+                                    preserveAspectRatio="none"></svg>
+                            </div>
+
+                            <div id="cardsGrid" class="cards-grid"></div>
+                        </div>
+
+                        <aside class="side">
+                            <h4>Availability</h4>
+                            <div class="stat">
+                                <span><i class="legend-dot av"></i>Available</span><b id="stAvailable">0</b>
+                            </div>
+                            <div class="stat">
+                                <span><i class="legend-dot re"></i>Reserved</span><b id="stReserved">0</b>
+                            </div>
+                            <div class="stat">
+                                <span><i class="legend-dot so"></i>Sold</span><b id="stSold">0</b>
+                            </div>
+                            <p class="side-note" id="priceRange">Price range: —</p>
+                            <p class="side-note">
+                                لو عايز كل وحدة تبقى في مكانها بالظبط، ضيف لكل unit عمود
+                                <b>points</b> في الشيت.
+                            </p>
+                        </aside>
+                    </div>
+                </div>
+            </div>
+
+            <div id="unitModal" class="unit-modal">
+                <div class="unit-box">
+                    <button class="modal-close" id="closeUnit">×</button>
+
+                    <span id="mBadge" class="badge available">Available</span>
+                    <h3 id="mName">Unit</h3>
+
+                    <div class="row"><span>Floor</span><b id="mFloor">—</b></div>
+                    <div class="row"><span>Status</span><b id="mStatus">—</b></div>
+                    <div class="row"><span>Area</span><b id="mArea">—</b></div>
+                    <div class="row"><span>Price</span><b id="mPrice">—</b></div>
+                    <div class="row"><span>Type</span><b id="mType">—</b></div>
+
+                    <div class="media-actions">
+                        <button class="media-btn" id="btnImg" onclick="openMedia('img')">
+                            <span class="icon">🖼️</span> Image
+                        </button>
+                        <button class="media-btn" id="btnBrochure" onclick="openMedia('brochure')">
+                            <span class="icon">📄</span> Brochure
+                        </button>
+                        <button class="media-btn" id="btnTour" onclick="openMedia('tour')">
+                            <span class="icon">🎥</span> Tour
+                        </button>
+                        <button class="media-btn" id="btn3D" onclick="openMedia('3d')">
+                            <span class="icon">🧊</span> 3D View
+                        </button>
+                        <button class="media-btn" id="btnBalcony" onclick="openMedia('balcony')">
+                            <span class="icon">🌅</span> Balcony
+                        </button>
+                        <button class="media-btn" id="btnPlan" onclick="openMedia('plan')">
+                            <span class="icon">📐</span> Plans
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="mediaModal" class="media-modal">
+                <div class="media-panel">
+                    <div class="media-head">
+                        <div>
+                            <h3 id="mediaTitle">Media</h3>
+                            <p id="mediaSub">Unit name</p>
+                        </div>
+                        <button class="media-close" onclick="closeMediaModal()" aria-label="Close">
+                            ×
+                        </button>
+                    </div>
+
+                    <div class="media-tabs" id="mediaTabs">
+                        <button class="media-tab active" data-tab="img" onclick="switchMediaTab('img')">
+                            🖼️ Image
+                        </button>
+                        <button class="media-tab" data-tab="brochure" onclick="switchMediaTab('brochure')">
+                            📄 Brochure
+                        </button>
+                        <button class="media-tab" data-tab="tour" onclick="switchMediaTab('tour')">
+                            🎥 Tour
+                        </button>
+                        <button class="media-tab" data-tab="3d" onclick="switchMediaTab('3d')">
+                            🧊 3D View
+                        </button>
+                        <button class="media-tab" data-tab="balcony" onclick="switchMediaTab('balcony')">
+                            🌅 Balcony
+                        </button>
+                        <button class="media-tab" data-tab="plan" onclick="switchMediaTab('plan')">
+                            📐 Plans
+                        </button>
+                    </div>
+
+                    <div class="media-body" id="mediaBody"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="unitHoverCard" class="unit-hover-card">
+            <div class="unit-hover-img" id="unitHoverImg"></div>
+
+            <div class="unit-hover-body">
+                <div class="unit-hover-top">
+                    <div>
+                        <div class="unit-hover-title" id="unitHoverName">Unit</div>
+                        <div class="unit-hover-type" id="unitHoverType">—</div>
+                    </div>
+
+                    <span id="unitHoverStatus" class="unit-hover-status available">
+                        Available
+                    </span>
+                </div>
+
+                <div class="unit-hover-info">
+                    <div class="unit-hover-row">
+                        <span>Floor</span>
+                        <b id="unitHoverFloor">—</b>
+                    </div>
+
+                    <div class="unit-hover-row">
+                        <span>Area</span>
+                        <b id="unitHoverArea">—</b>
+                    </div>
+
+                    <div class="unit-hover-row">
+                        <span>Price</span>
+                        <b id="unitHoverPrice">—</b>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- Floor summary: same shell as the unit card, shown when the 3D overlay
+     carries floor volumes (see FLOOR VOLUMES in the main script). -->
+        <div id="floorHoverCard" class="unit-hover-card floor-hover-card">
+            <div class="unit-hover-body">
+                <div class="unit-hover-title" id="floorHoverName">Floor</div>
+                <div class="unit-hover-type" id="floorHoverCount">—</div>
+                <div class="floor-hover-stats" id="floorHoverStats"></div>
+                <div class="unit-hover-info" id="floorHoverInfo"></div>
+                <div class="floor-hover-cta">Click to view units</div>
+            </div>
+        </div>
+        <div id="unitSideBackdrop" class="unit-side-backdrop"></div>
+
+        <aside id="unitSideMenu" class="unit-side-menu">
+            <div class="unit-side-head">
+                <div>
+                    <div class="unit-side-kicker">Unit Details</div>
+                    <div id="sideUnitName" class="unit-side-title">Unit</div>
+                    <div id="sideUnitSub" class="unit-side-sub">—</div>
+                </div>
+
+                <div class="unit-side-head-actions">
+                    <button id="shareUnitBtn" class="unit-side-share" type="button" title="Copy share link"
+                        aria-label="Copy share link">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <circle cx="18" cy="5" r="3" />
+                            <circle cx="6" cy="12" r="3" />
+                            <circle cx="18" cy="19" r="3" />
+                            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+                            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+                        </svg>
+                    </button>
+                    <button id="closeUnitSide" class="unit-side-close" type="button">×</button>
+                </div>
+            </div>
+
+            <div class="unit-side-scroll">
+                <!-- The floor plan (units.col_l) with the status badge; the unit photo
+         when the plan is not an image. Filled by renderSideUnitImage(). -->
+                <div class="unit-side-image" id="sideUnitImage">
+                    <div class="unit-side-image-empty">No image available</div>
+                </div>
+
+                <div class="unit-side-section">
+                    <div class="unit-side-section-title">Details</div>
+
+                    <div class="unit-side-details">
+                        <div class="unit-side-detail">
+                            <span>Floor</span>
+                            <b id="sideUnitFloor">—</b>
+                        </div>
+
+                        <div class="unit-side-detail">
+                            <span>Bedrooms</span>
+                            <b id="sideUnitRooms">—</b>
+                        </div>
+
+                        <div class="unit-side-detail">
+                            <span>Area</span>
+                            <b id="sideUnitArea">—</b>
+                        </div>
+
+                        <div class="unit-side-detail">
+                            <span>Price</span>
+                            <b id="sideUnitPrice">—</b>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rooms & features (units columns of SQL section 9): the counts as rows, the yes / no
+         features as pills — only what this unit has. Filled by renderSideFeatures(). -->
+                <div class="unit-side-section" id="sideFeaturesSection" style="display: none">
+                    <div class="unit-side-section-title">Rooms &amp; features</div>
+                    <div class="unit-side-details" id="sideFeatureRows"></div>
+                    <div class="unit-side-features" id="sideFeatureChips"></div>
+                </div>
+
+                <!-- 3D images: the interior renders of this unit's type (gallery → Unit
+         Prototypes), opened in the gallery lightbox. Filled by renderSide3d(). -->
+                <div class="unit-side-section" id="side3dSection" style="display: none">
+                    <div class="unit-side-section-title">3D images<span class="unit-side-count" id="side3dCount"></span>
+                    </div>
+                    <div class="unit-side-3d" id="side3dStrip"></div>
+                </div>
+
+                <div class="unit-side-section">
+                    <div class="unit-side-section-title">Media</div>
+
+                    <div class="unit-side-media-grid">
+                        <button class="unit-side-media" id="sideImg" type="button" onclick="openMedia('img')">
+                            <span class="unit-side-media-icon">🖼️</span>
+                            <span class="unit-side-media-label">Image</span>
+                            <span class="unit-side-media-status">Open image</span>
+                        </button>
+
+                        <button class="unit-side-media" id="sideBrochure" type="button" onclick="openMedia('brochure')">
+                            <span class="unit-side-media-icon">📄</span>
+                            <span class="unit-side-media-label">Brochure</span>
+                            <span class="unit-side-media-status">Open brochure</span>
+                        </button>
+
+                        <button class="unit-side-media" id="sideTour" type="button" onclick="openMedia('tour')">
+                            <span class="unit-side-media-icon">🎥</span>
+                            <span class="unit-side-media-label">3D Tour</span>
+                            <span class="unit-side-media-status">Open tour</span>
+                        </button>
+
+                        <button class="unit-side-media" id="side3D" type="button" onclick="openMedia('3d')">
+                            <span class="unit-side-media-icon">🧊</span>
+                            <span class="unit-side-media-label">3D View</span>
+                            <span class="unit-side-media-status">Open 3D</span>
+                        </button>
+
+                        <button class="unit-side-media" id="sideBalcony" type="button" onclick="openMedia('balcony')">
+                            <span class="unit-side-media-icon">🌅</span>
+                            <span class="unit-side-media-label">Balcony</span>
+                            <span class="unit-side-media-status">Open view</span>
+                        </button>
+
+                        <button class="unit-side-media" id="sidePlan" type="button" onclick="openMedia('plan')">
+                            <span class="unit-side-media-icon">📐</span>
+                            <span class="unit-side-media-label">Plans</span>
+                            <span class="unit-side-media-status">Open plans</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="unit-side-section">
+                    <button id="sideWhatsApp" class="unit-side-whatsapp" type="button">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+                            <path
+                                d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.82 11.82 0 018.413 3.488 11.82 11.82 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.978-1.607zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
+                        </svg>
+                        Contact Sales on WhatsApp
+                    </button>
+
+                    <button id="sideCompareBtn" class="side-compare-btn" type="button">♡ Compare</button>
+                </div>
+            </div>
+
+
+        </aside>
+        <div class="unit-side-actions">
+            <!-- Units Table Drawer -->
+            <button id="unitsTableToggle" class="units-table-toggle" type="button">
+                <span>☰</span>
+                <b>Units</b>
+            </button>
+            <button id="compareToggle" class="compare-mini-toggle" type="button">
+                <span>♥</span>
+                <b id="compareCount">0</b>
+            </button>
+        </div>
+        <div id="unitsTableBackdrop" class="units-table-backdrop"></div>
+
+        <aside id="unitsTableDrawer" class="units-table-drawer">
+            <div id="unitsTableResizeHandle" class="units-table-resize-handle" role="separator"
+                aria-label="Resize units table" aria-orientation="horizontal" tabindex="0"></div>
+
+            <div class="units-table-head">
+                <div>
+                    <div class="units-table-kicker">Excel Sheet</div>
+                    <h2>Units Table</h2>
+                    <p id="unitsTableCount">0 units</p>
+                </div>
+
+                <div class="table-head-actions">
+                    <button id="tableHeadGallery" class="table-head-icon-btn" type="button" title="Gallery">
+                        🖼️
+                    </button>
+                    <button id="tableHeadFavourites" class="table-head-icon-btn" type="button" title="Favourites">
+                        ♥
+                        <span class="btn-badge" id="tableHeadFavBadge">0</span>
+                    </button>
+                </div>
+
+                <button id="closeUnitsTable" class="units-table-close" type="button">×</button>
+            </div>
+
+            <div class="units-table-filters">
+                <div class="units-search-wrap">
+                    <span>🔎</span>
+                    <input id="tableSearch" type="text" placeholder="Search unit, type, status..." />
+                </div>
+
+                <div class="filter-grid">
+                    <label>
+                        Floor
+                        <select id="tableFloorFilter">
+                            <option value="">All Floors</option>
+                        </select>
+                    </label>
+
+                    <label>
+                        Status
+                        <select id="tableStatusFilter">
+                            <option value="">All Status</option>
+                            <option value="available">Available</option>
+                            <option value="reserved">Reserved</option>
+                            <option value="sold">Sold</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="range-filter">
+                    <div class="range-filter-head">
+                        <span class="range-filter-label">Price (SAR)</span>
+                        <span class="range-filter-vals">
+                            <b id="priceValMin">—</b> – <b id="priceValMax">—</b>
+                        </span>
+                    </div>
+                    <div class="dual-range" id="priceRange">
+                        <div class="dual-range-track"></div>
+                        <div class="dual-range-fill" id="priceFill"></div>
+                        <input id="tableMinPrice" class="dual-range-input" type="range" />
+                        <input id="tableMaxPrice" class="dual-range-input" type="range" />
+                    </div>
+                </div>
+
+                <div class="range-filter">
+                    <div class="range-filter-head">
+                        <span class="range-filter-label">Area (m²)</span>
+                        <span class="range-filter-vals">
+                            <b id="areaValMin">—</b> – <b id="areaValMax">—</b>
+                        </span>
+                    </div>
+                    <div class="dual-range" id="areaRange">
+                        <div class="dual-range-track"></div>
+                        <div class="dual-range-fill" id="areaFill"></div>
+                        <input id="tableMinArea" class="dual-range-input" type="range" />
+                        <input id="tableMaxArea" class="dual-range-input" type="range" />
+                    </div>
+                </div>
+
+                <button id="resetTableFilters" class="reset-table-filters" type="button">
+                    Reset Filters
+                </button>
+            </div>
+
+            <div class="units-table-wrap">
+                <table class="units-data-table">
+                    <thead>
+                        <tr>
+                            <th>Compare</th>
+                            <th>Unit</th>
+                            <th>Floor</th>
+                            <th>Status</th>
+                            <th>Area</th>
+                            <th>Price</th>
+                            <th>Type</th>
+                        </tr>
+                    </thead>
+
+                    <tbody id="unitsTableBody">
+                        <tr>
+                            <td colspan="7" class="table-empty">Loading sheet data...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </aside>
+
+        <div id="compareBackdrop" class="compare-backdrop"></div>
+
+        <aside id="compareDrawer" class="compare-drawer">
+            <div class="compare-head">
+                <div>
+                    <div class="compare-kicker">Selected Units</div>
+                    <h2>Compare Units</h2>
+                    <p id="compareSub">0 units selected</p>
+                </div>
+
+                <button id="closeCompare" class="compare-close" type="button">×</button>
+            </div>
+
+            <div id="compareCards" class="compare-cards">
+                <div class="compare-empty">
+                    No units selected yet. Press the heart beside any unit.
+                </div>
+            </div>
+
+            <div class="compare-footer">
+                <button id="clearCompare" class="clear-compare-btn" type="button">
+                    Clear Compare
+                </button>
+            </div>
+        </aside>
+
+        <!-- Gallery Toggle Button -->
+        <button id="galleryToggle" class="gallery-toggle" type="button">
+            <span>🖼️</span>
+            <b>Gallery</b>
+        </button>
+
+        <!-- Gallery Overlay -->
+        <div id="galleryOverlay" class="gallery-overlay">
+            <div class="gallery-modal">
+                <div class="gallery-topbar">
+                    <button class="gallery-back-btn" id="galleryClose" type="button">
+                        ← Main view
+                    </button>
+                    <button class="gallery-x-btn" id="galleryCloseX" type="button">×</button>
+                </div>
+                <div class="gallery-body">
+                    <nav class="gallery-sidebar" id="gallerySidebar"></nav>
+                    <div class="gallery-grid-area">
+                        <div class="gallery-masonry" id="galleryMasonry"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gallery Lightbox -->
+        <div id="galleryLightbox" class="gallery-lightbox">
+            <button class="gallery-lb-close" id="galleryLbClose" type="button">×</button>
+            <button class="gallery-lb-prev" id="galleryLbPrev" type="button">&#8249;</button>
+            <img id="galleryLbImg" src="" alt="" />
+            <button class="gallery-lb-next" id="galleryLbNext" type="button">&#8250;</button>
+            <div class="gallery-lb-caption" id="galleryLbCaption"></div>
+        </div>
+
+        <!-- ============ EXPLODED FLOOR VIEW (3D mode only) ============ -->
+        <div class="ex3d-bar" id="ex3dBar" role="group" aria-label="Exploded floor view">
+            <button class="ex3d-toggle" id="ex3dToggle" type="button" aria-pressed="false">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round">
+                    <path d="M3 6h18" />
+                    <path d="M3 12h18" />
+                    <path d="M3 18h18" />
+                    <path d="m7 3 5-2 5 2" />
+                    <path d="m17 21-5 2-5-2" />
+                </svg>
+                <span id="ex3dToggleLabel">Exploded view</span>
+            </button>
+            <label class="ex3d-spread" for="ex3dRange">
+                <span>Spread</span>
+                <input id="ex3dRange" type="range" min="0" max="100" value="0" aria-label="Floor spread" />
+            </label>
+        </div>
+
+        <!-- ===================== ELEGANT TOP HEADER ===================== -->
+        <header class="oc-header" id="ocHeader" aria-label="Main navigation">
+            <div class="och-brand">
+                <span class="brand-logo brand-logo-20" data-project-logo><img src="01%20copy.png" alt="Khawalid 20"
+                        draggable="false" /></span>
+            </div>
+
+            <button class="och-burger" id="ochBurger" type="button" aria-label="Menu" aria-expanded="false">
+                <i></i><i></i><i></i>
+            </button>
+
+            <div class="och-collapse" id="ochCollapse">
+                <div class="och-div"></div>
+
+                <nav class="och-nav">
+                    <button class="och-link" id="ochHome" type="button">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 11l9-8 9 8" />
+                            <path d="M5 10v10h14V10" />
+                            <path d="M9 20v-6h6v6" />
+                        </svg>
+                        <span class="och-label">Home</span>
+                    </button>
+
+                    <div class="och-floors" id="ochFloors">
+                        <button class="och-link" id="ochFloorsBtn" type="button" aria-haspopup="true"
+                            aria-expanded="false">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 3 2 8l10 5 10-5-10-5z" />
+                                <path d="M2 12l10 5 10-5" />
+                                <path d="M2 16l10 5 10-5" />
+                            </svg>
+                            <span id="ochFloorsLabel">Prototype</span>
+                            <svg class="och-caret" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M6 9l6 6 6-6" />
+                            </svg>
+                        </button>
+                        <!-- Prototype = unit type filter (mirrors the Type chips in Unit Search).
+             data-type must match the "type" column of the sheet. -->
+                        <div class="och-dropdown" role="menu">
+                            <div class="och-dd-cap">Choose a prototype</div>
+                            <button class="och-dd-item" data-type="" type="button"><span class="och-dd-dot"></span>All
+                                prototypes</button>
+                            <button class="och-dd-item" data-type="1 Bedroom" type="button"><span
+                                    class="och-dd-dot"></span>1 Bedroom</button>
+                            <button class="och-dd-item" data-type="2 Bedrooms" type="button"><span
+                                    class="och-dd-dot"></span>2 Bedrooms</button>
+                            <button class="och-dd-item" data-type="3 Bedrooms" type="button"><span
+                                    class="och-dd-dot"></span>3 Bedrooms</button>
+                            <div class="och-dd-sep"></div>
+                            <!-- Jumps straight into the 3D massing with the prototype highlight
+               already applied, so the choice above is immediately visible. -->
+                            <button class="och-dd-go" id="ochProto3D" type="button">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M12 2 2 7l10 5 10-5-10-5Z" />
+                                    <path d="M2 17l10 5 10-5" />
+                                    <path d="M2 12l10 5 10-5" />
+                                </svg>
+                                <span>View in 3D</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button class="och-link" id="ochUnits" type="button">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 5h18" />
+                            <path d="M3 12h18" />
+                            <path d="M3 19h18" />
+                        </svg>
+                        <span class="och-label">Units</span>
+                    </button>
+
+                    <button class="och-link" id="ochCompare" type="button">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path
+                                d="M20.8 5.6a5.4 5.4 0 0 0-7.7 0L12 6.7l-1.1-1.1a5.4 5.4 0 1 0-7.7 7.7L12 22l8.8-8.7a5.4 5.4 0 0 0 0-7.7z" />
+                        </svg>
+                        <span class="och-label">Compare</span>
+                        <span class="och-count" id="ochCompareCount" data-empty="1">0</span>
+                    </button>
+
+                    <button class="och-link" id="ochGallery" type="button">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" />
+                            <circle cx="8.5" cy="8.5" r="1.6" />
+                            <path d="m21 15-5-5L5 21" />
+                        </svg>
+                        <span class="och-label">Gallery</span>
+                    </button>
+
+                    <button class="och-link" id="ochSurround" type="button">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 10c0 6-9 12-9 12s-9-6-9-12a9 9 0 0 1 18 0z" />
+                            <circle cx="12" cy="10" r="3" />
+                        </svg>
+                        <span class="och-label">Surrounding</span>
+                    </button>
+                </nav>
+
+                <div class="och-div"></div>
+
+                <!-- Scene tools: units overlay + 3D massing. These drive the original
+         floating pills (#hideUnitsToggle / #mode3DToggle), which stay in the
+         DOM as the source of truth but are no longer shown once the header is live. -->
+                <div class="och-tools">
+                    <span class="och-view-label">Scene</span>
+                    <div class="och-seg">
+                        <button class="och-seg-btn och-tool" id="ochEye" type="button" title="Hide units"
+                            aria-label="Show or hide the 3D overlay" aria-pressed="false">
+                            <svg class="och-ic-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+                                <circle cx="12" cy="12" r="3" />
+                            </svg>
+                            <svg class="och-ic-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M9.88 9.88a3 3 0 1 0 4.24 4.24" />
+                                <path d="M10.73 5.08A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a13.2 13.2 0 0 1-1.67 2.68" />
+                                <path d="M6.61 6.61A13.5 13.5 0 0 0 2 12s3.5 7 10 7a9.7 9.7 0 0 0 5.39-1.61" />
+                                <line x1="2" y1="2" x2="22" y2="22" />
+                            </svg>
+                            <span class="och-util-text" id="ochEyeLabel">Hide units</span>
+                        </button>
+                        <button class="och-seg-btn och-tool" id="och3D" type="button" title="3D View"
+                            aria-label="Toggle 3D view" aria-pressed="false">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M12 2 2 7l10 5 10-5-10-5Z" />
+                                <path d="M2 17l10 5 10-5" />
+                                <path d="M2 12l10 5 10-5" />
+                            </svg>
+                            <span class="och-util-text" id="och3DLabel">3D View</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="och-view">
+                    <span class="och-view-label">View</span>
+                    <div class="och-seg">
+                        <button class="och-seg-btn" data-scene="exterior" type="button" title="Day"
+                            aria-label="Day view">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="4" />
+                                <path
+                                    d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
+                            </svg>
+                        </button>
+                        <button class="och-seg-btn" data-scene="night" type="button" title="Night"
+                            aria-label="Night view">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 12.79A9 9 0 1 1 11.21 3a7 7 0 0 0 9.79 9.79z" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="och-div"></div>
+
+                <div class="och-util">
+                    <button class="och-icon-btn" id="ochLang" type="button" aria-label="Switch language">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="9" />
+                            <path d="M3 12h18" />
+                            <path d="M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z" />
+                        </svg>
+                        <span id="ochLangLabel">عربي</span>
+                    </button>
+                    <button class="och-icon-btn" id="ochTut" type="button" aria-label="How to use this site">
+                        <span class="och-q">?</span>
+                        <span class="och-util-text">Tutorial</span>
+                    </button>
+                    <button class="och-icon-btn och-only-mobile" id="ochOrient" type="button"
+                        aria-label="Rotate screen orientation">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 12a9 9 0 0 1-9 9c-2.5 0-4.8-1-6.4-2.6" />
+                            <path d="M3 12a9 9 0 0 1 9-9c2.5 0 4.8 1 6.4 2.6" />
+                            <polyline points="18 1.6 18.5 5.6 14.5 6.1" />
+                            <polyline points="6 22.4 5.5 18.4 9.5 17.9" />
+                        </svg>
+                        <span class="och-util-text">Rotate screen</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- ===================== UNIT SEARCH PANEL (left) ===================== -->
+        <aside id="unitSearchPanel" class="usp" aria-label="Unit search">
+            <div class="usp-head">
+                <div class="usp-title">
+                    <span class="usp-title-ico" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="7" />
+                            <path d="m21 21-4.3-4.3" />
+                        </svg>
+                    </span>
+                    Unit Search
+                </div>
+                <button class="usp-close" id="uspClose" type="button" aria-label="Close">×</button>
+            </div>
+
+            <div class="usp-body">
+                <section class="usp-sec">
+                    <div class="usp-sec-h">Surface</div>
+                    <div class="usp-slabel"><b id="uspAreaMinV">—</b> – <b id="uspAreaMaxV">—</b> m²</div>
+                    <!-- Steppers walk the thumbs through the areas that actually exist in
+           the data (next / previous real value), never an arbitrary number. -->
+                    <div class="usp-range">
+                        <div class="usp-step" data-thumb="min" aria-label="Minimum surface">
+                            <button type="button" class="usp-step-btn" data-dir="1"
+                                aria-label="Next larger minimum">▲</button>
+                            <button type="button" class="usp-step-btn" data-dir="-1"
+                                aria-label="Previous smaller minimum">▼</button>
+                        </div>
+                        <div class="usp-dual" id="uspAreaDual">
+                            <div class="usp-dual-track"></div>
+                            <div class="usp-dual-fill" id="uspAreaFill"></div>
+                            <input type="range" id="uspAreaMin" class="usp-dual-input" min="0" max="100" value="0" />
+                            <input type="range" id="uspAreaMax" class="usp-dual-input" min="0" max="100" value="100" />
+                        </div>
+                        <div class="usp-step" data-thumb="max" aria-label="Maximum surface">
+                            <button type="button" class="usp-step-btn" data-dir="1"
+                                aria-label="Next larger maximum">▲</button>
+                            <button type="button" class="usp-step-btn" data-dir="-1"
+                                aria-label="Previous smaller maximum">▼</button>
+                        </div>
+                    </div>
+                    <div class="usp-scale"><span id="uspAreaScaleMin">—</span><span id="uspAreaScaleMax">—</span></div>
+                </section>
+
+                <section class="usp-sec">
+                    <div class="usp-sec-h">Availability</div>
+                    <div class="usp-chips" id="uspAvail">
+                        <button type="button" class="usp-chip" data-status="available">Available</button>
+                        <button type="button" class="usp-chip" data-status="reserved">Reserved</button>
+                        <button type="button" class="usp-chip" data-status="sold">Sold</button>
+                    </div>
+                </section>
+
+                <section class="usp-sec" id="uspTypeSec">
+                    <div class="usp-sec-h">Type</div>
+                    <div class="usp-chips" id="uspTypes"><!-- built from data --></div>
+                </section>
+
+                <section class="usp-sec">
+                    <div class="usp-sec-h">Floor</div>
+                    <div class="usp-chips" id="uspFloors"><!-- built from data --></div>
+                </section>
+
+                <!-- Rooms & features (UNIT_FEATURES): Facing, Bathrooms, … and a Features group — sections built
+         from the data, only where this project's units have it (none for a project without the columns). -->
+                <div id="uspFeatureSecs"></div>
+
+                <section class="usp-sec" id="uspBudgetSec">
+                    <div class="usp-sec-h">Budget</div>
+                    <div class="usp-slabel"><b id="uspBudgetMinV">—</b> – <b id="uspBudgetMaxV">—</b></div>
+                    <div class="usp-range">
+                        <div class="usp-step" data-thumb="min" aria-label="Minimum budget">
+                            <button type="button" class="usp-step-btn" data-dir="1"
+                                aria-label="Next higher minimum">▲</button>
+                            <button type="button" class="usp-step-btn" data-dir="-1"
+                                aria-label="Previous lower minimum">▼</button>
+                        </div>
+                        <div class="usp-dual" id="uspBudgetDual">
+                            <div class="usp-dual-track"></div>
+                            <div class="usp-dual-fill" id="uspBudgetFill"></div>
+                            <input type="range" id="uspBudgetMin" class="usp-dual-input" min="0" max="100" value="0" />
+                            <input type="range" id="uspBudgetMax" class="usp-dual-input" min="0" max="100"
+                                value="100" />
+                        </div>
+                        <div class="usp-step" data-thumb="max" aria-label="Maximum budget">
+                            <button type="button" class="usp-step-btn" data-dir="1"
+                                aria-label="Next higher maximum">▲</button>
+                            <button type="button" class="usp-step-btn" data-dir="-1"
+                                aria-label="Previous lower maximum">▼</button>
+                        </div>
+                    </div>
+                    <div class="usp-scale"><span id="uspBudgetScaleMin">—</span><span id="uspBudgetScaleMax">—</span>
+                    </div>
+                </section>
+
+            </div>
+
+            <div class="usp-foot">
+                <button class="usp-reset" id="uspReset" type="button">Reset</button>
+                <button class="usp-view" id="uspView" type="button">
+                    <b id="uspCount">0</b><span>units — View list</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- ===================== UNIT LIST PANEL (results, next to search) ===================== -->
+        <aside id="unitListPanel" class="ulp" aria-label="Unit results">
+            <div class="usp-head">
+                <div class="usp-title">
+                    <span class="usp-title-ico" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                            stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M8 6h13" />
+                            <path d="M8 12h13" />
+                            <path d="M8 18h13" />
+                            <path d="M3 6h.01M3 12h.01M3 18h.01" />
+                        </svg>
+                    </span>
+                    Units <span class="ulp-hcount" id="ulpCount">0</span>
+                </div>
+                <button class="usp-close" id="ulpClose" type="button" aria-label="Close">×</button>
+            </div>
+            <div class="ulp-body" id="ulpBody"></div>
+        </aside>
+
+        <!-- ===================== TOP-LEFT CONTROLS (LANGUAGE + TUTORIAL) ===================== -->
+        <div class="corner-controls">
+            <button id="langToggle" class="lang-toggle" type="button" aria-label="Switch language / تغيير اللغة">
+                <span class="lang-toggle-icon" aria-hidden="true">🌐</span>
+                <b id="langToggleLabel">العربية</b>
+            </button>
+            <button id="tutLauncher" class="tut-launcher" type="button" aria-label="How to use this site">
+                <span class="tut-launcher-q" aria-hidden="true">?</span>
+                <b>Tutorial</b>
+            </button>
+        </div>
+
+        <div id="tutCatcher" class="tut-catcher" aria-hidden="true"></div>
+        <div id="tutHighlight" class="tut-highlight" aria-hidden="true"></div>
+        <div id="tutBubble" class="tut-bubble" role="dialog" aria-modal="true" aria-labelledby="tutTitle">
+            <button id="tutClose" class="tut-close" type="button" aria-label="Close tutorial">×</button>
+            <div class="tut-arrow" id="tutArrow"></div>
+
+            <div class="tut-row">
+                <div class="tut-icon" id="tutIcon">👋</div>
+                <div class="tut-text">
+                    <div class="tut-title" id="tutTitle">Welcome</div>
+                    <div class="tut-desc" id="tutDesc">Description</div>
+                </div>
+            </div>
+
+            <div class="tut-foot">
+                <div class="tut-dots" id="tutDots"></div>
+                <div class="tut-nav">
+                    <button class="tut-btn" id="tutBack" type="button">Back</button>
+                    <button class="tut-btn tut-primary" id="tutNext" type="button">Next</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modern three (module build) re-exposed on window.THREE so the classic
+     inline script below keeps working unchanged. Everything the app uses --
+     FBXLoader, OrbitControls, RoomEnvironment -- is hung off THREE too, exactly
+     where the old r128 global build used to put it. Because module scripts are
+     deferred, the classic script can't call initThreeOverlay() directly any
+     more: it waits on window.threeLibReady (resolved here). -->
+        <!-- Created before the module below so the resolver always exists when the
+         module finishes importing, whatever order the browser settles on. -->
+        <script>
+            window.threeLibReady = new Promise((resolve) => {
+                window.__resolveThreeLib = resolve;
+            });
+        </script>
+        <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.180.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.180.0/examples/jsm/"
+        }
+      }
+    </script>
+        <script type="module">
+            import * as THREE from "three";
+            import { FBXLoader } from "three/addons/loaders/FBXLoader.js";
+            import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+            import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+
+            // A module namespace object is frozen, so the addons can't be assigned
+            // onto it the way the old global build allowed. Spread into a plain
+            // object first, then attach them where the existing code expects them.
+            window.THREE = { ...THREE, FBXLoader, OrbitControls, RoomEnvironment };
+            window.__resolveThreeLib?.();
+        </script>
+
+        <script src="js/01-frame-viewer.js"></script>
+        <script src="js/02-supabase-config.js"></script>
+        <script src="js/03-three-overlay.js"></script>
+        <script src="js/04-three-mode.js"></script>
+        <script src="js/05-three-materials.js"></script>
+        <script src="js/06-exploded-view.js"></script>
+        <script src="js/07-drag-rotate.js"></script>
+        <script src="js/08-progressive-load.js"></script>
+        <script src="js/09-scene-switcher.js"></script>
+        <script src="js/10-units-data.js"></script>
+        <script src="js/11-units-colors.js"></script>
+        <script src="js/12-floor-volumes.js"></script>
+        <script src="js/13-units-source.js"></script>
+        <script src="js/14-unit-share.js"></script>
+        <script src="js/15-live-updates.js"></script>
+        <script src="js/16-units-table.js"></script>
+        <script src="js/17-compare.js"></script>
+        <script src="js/18-gallery.js"></script>
+
+        <!-- ===================== UNIT FINDER CHATBOT ===================== -->
+        <button id="ufLauncher" class="uf-launcher" type="button" aria-label="Open Unit Finder">
+            <span class="uf-launcher-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                    stroke-linejoin="round" aria-hidden="true">
+                    <path
+                        d="M21 11.5a8.4 8.4 0 0 1-9 8.5 9.6 9.6 0 0 1-2.9-.4L3 21l1.4-4.1A8.2 8.2 0 0 1 3 11.5 8.4 8.4 0 0 1 12 3a8.4 8.4 0 0 1 9 8.5z">
+                    </path>
+                    <path d="M8.2 11.5h.01M12 11.5h.01M15.8 11.5h.01" stroke-width="2.6"></path>
+                </svg>
+            </span>
+        </button>
+
+        <div id="ufWindow" class="uf-window" role="dialog" aria-label="Unit Finder">
+            <div class="uf-header">
+                <div class="uf-header-left">
+                    <div class="uf-avatar">🏢</div>
+                    <div>
+                        <div class="uf-title">Unit Finder</div>
+                        <div class="uf-subtitle" id="ufAssistantName">Khawalid 20 Assistant</div>
+                    </div>
+                </div>
+                <button id="ufClose" class="uf-close" type="button" aria-label="Close">×</button>
+            </div>
+            <div id="ufBody" class="uf-body"></div>
+        </div>
+
+        <script src="js/19-chatbot.js"></script>
+
+        <!-- ===================== WHATSAPP CHAT WIDGET ===================== -->
+        <button id="locLauncher" class="loc-launcher" type="button" aria-label="Show project location">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                <circle cx="12" cy="10" r="3"></circle>
+            </svg>
+        </button>
+
+        <!-- Zoning launcher — sits directly above the WhatsApp button -->
+        <button id="znLauncher" class="zn-launcher" type="button" aria-label="Open unit mix" title="Unit mix">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 21h18"></path>
+                <path d="M6 21V5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v16"></path>
+                <path d="M14 21V9h3a1 1 0 0 1 1 1v11"></path>
+                <path d="M9 7.5h2M9 11h2M9 14.5h2"></path>
+            </svg>
+        </button>
+
+        <button id="waLauncher" class="wa-launcher" type="button" aria-label="Chat with sales on WhatsApp">
+            <svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor" aria-hidden="true">
+                <path
+                    d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.82 11.82 0 018.413 3.488 11.82 11.82 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.978-1.607zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
+            </svg>
+        </button>
+
+        <div id="waPanel" class="wa-panel" role="dialog" aria-label="WhatsApp chat">
+            <div class="wa-head">
+                <div class="wa-head-left">
+                    <div class="wa-avatar">
+                        <svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor" aria-hidden="true">
+                            <path
+                                d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.82 11.82 0 018.413 3.488 11.82 11.82 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.978-1.607zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <div class="wa-title">Customer Service</div>
+                        <div class="wa-sub" id="waSubName">Khawalid 20 · Typically replies instantly</div>
+                    </div>
+                </div>
+                <button id="waClose" class="wa-close" type="button" aria-label="Close">×</button>
+            </div>
+            <div class="wa-body">
+                <div class="wa-msg">
+                    <div id="waBubble" class="wa-bubble"></div>
+                    <div id="waTime" class="wa-time"></div>
+                </div>
+            </div>
+            <div class="wa-footer">
+                <button id="waCopyBtn" class="wa-copy" type="button"><span>📋</span><b>Copy details</b></button>
+                <button id="waOpenBtn" class="wa-open-btn" type="button">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true">
+                        <path
+                            d="M.057 24l1.687-6.163a11.867 11.867 0 01-1.587-5.946C.16 5.335 5.495 0 12.05 0a11.82 11.82 0 018.413 3.488 11.82 11.82 0 013.48 8.414c-.003 6.557-5.338 11.892-11.893 11.892a11.9 11.9 0 01-5.688-1.448L.057 24zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884a9.86 9.86 0 001.51 5.26l-.999 3.648 3.978-1.607zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z" />
+                    </svg>
+                    <b>Open WhatsApp</b>
+                </button>
+            </div>
+        </div>
+
+        <!-- ===================== ZONING DIRECTORY OVERLAY ===================== -->
+        <div id="zoningOverlay" class="zn-overlay" role="dialog" aria-modal="true" aria-label="Unit mix"
+            aria-hidden="true">
+            <div class="zn-backdrop" data-zn-close></div>
+            <div class="zn-sheet" role="document">
+                <button class="zn-x" type="button" aria-label="Close" data-zn-close>&times;</button>
+
+                <div class="zn-top">
+                    <div class="zn-aside">
+                        <div class="zn-aside-frame">
+                            <span class="zn-aside-title">UNIT MIX</span>
+                        </div>
+                    </div>
+
+                    <div class="zn-main">
+                        <!-- Figures from the "Areas" page of the concept-design brochure (3-9-2025) -->
+                        <section class="zn-group">
+                            <h3 class="zn-group-title">Ground Floor · 14 units</h3>
+                            <div class="zn-tags">
+                                <span class="zn-tag">2 × <b class="zn-em">1 Bedroom</b></span>
+                                <span class="zn-tag">6 × <b class="zn-em">2 Bedrooms</b></span>
+                                <span class="zn-tag">6 × <b class="zn-em">3 Bedrooms</b></span>
+                                <span class="zn-tag">Private gardens</span>
+                            </div>
+                        </section>
+
+                        <section class="zn-group">
+                            <h3 class="zn-group-title">First Floor · 20 units</h3>
+                            <div class="zn-tags">
+                                <span class="zn-tag">6 × <b class="zn-em">1 Bedroom</b></span>
+                                <span class="zn-tag">8 × <b class="zn-em">2 Bedrooms</b></span>
+                                <span class="zn-tag">6 × <b class="zn-em">3 Bedrooms</b></span>
+                            </div>
+                        </section>
+
+                        <section class="zn-group">
+                            <h3 class="zn-group-title">Second Floor · 15 units</h3>
+                            <div class="zn-tags">
+                                <span class="zn-tag">2 × <b class="zn-em">1 Bedroom</b></span>
+                                <span class="zn-tag">6 × <b class="zn-em">2 Bedrooms</b></span>
+                                <span class="zn-tag">7 × <b class="zn-em">3 Bedrooms</b></span>
+                            </div>
+                        </section>
+
+                        <section class="zn-group zn-group--stack">
+                            <h3 class="zn-group-title">Roof Floor · 6 units</h3>
+                            <div class="zn-tags">
+                                <span class="zn-tag">6 × <b class="zn-em">2 Bedrooms</b> with roof terraces</span>
+                                <span class="zn-tag">55 units total · 55 basement parking slots · 3,600 m² plot</span>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+                <div class="zn-actions">
+                    <button class="zn-action" type="button" data-zn-scene="exterior">Day view</button>
+                    <button class="zn-action" type="button" data-zn-scene="night">Night view</button>
+                </div>
+
+                <div class="zn-footer">
+                    <button class="zn-back" type="button" data-zn-close>
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                            stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M19 12H5"></path>
+                            <path d="M12 19l-7-7 7-7"></path>
+                        </svg>
+                        Back
+                    </button>
+                    <div class="zn-brand"><span class="brand-logo brand-logo-20" data-project-logo><img
+                                src="01%20copy.png" alt="Khawalid 20" draggable="false" /></span></div>
+                </div>
+            </div>
+        </div>
+
+        <script src="js/20-whatsapp.js"></script>
+        <script src="js/21-project-wiring.js"></script>
+
+        <!-- ===================== ARABIC TRANSLATION ENGINE ===================== -->
+        <script src="js/22-i18n-wiring.js"></script>
+        <script src="js/23-i18n.js"></script>
+
+        <!-- ===================== GUIDED TUTORIAL / ONBOARDING TOUR ===================== -->
+        <script src="js/24-tutorial.js"></script>
+
+        <!-- ============================================================
+         LOCATION INTRO MAP — logic (MapLibre GL globe + Esri / NASA
+         imagery + OpenFreeMap street names + OSRM routes)
+    ============================================================= -->
+        <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"
+            integrity="sha256-RamwepGJzlYFTGIKlHzPQeKR5YyV6bYVM7dAqqZe5cs=" crossorigin=""></script>
+        <script src="js/25-map.js"></script>
+    </div>
+    <!-- /#appRoot -->
+
+    <!-- ============================================================
+         ORIENTATION CONTROLLER — landscape / portrait for small screens
+         Shows the chooser on every load. On selection it goes fullscreen and
+         locks the native screen orientation (Android); if that's unavailable
+         (e.g. iOS) it falls back to rotating #appRoot 90deg via CSS.
+    ============================================================= -->
+    <script src="js/26-orientation.js"></script>
+
+    <!-- ===================== ELEGANT HEADER — wiring ===================== -->
+    <script src="js/27-header-wiring.js"></script>
+
+    <!-- ===================== UNIT SEARCH PANEL — wiring ===================== -->
+    <script src="js/28-search-panel.js"></script>
+    <script src="js/29-hero.js"></script>
+</body>
+
+</html>
