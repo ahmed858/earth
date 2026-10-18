@@ -94,7 +94,9 @@ function moveFrameFast(deltaX) {
 }
 
 function onFrameDragStart(event) {
-    if (sceneIsStill() || loadedCount < sceneUsedCount()) return; // nothing to drag on a still scene
+    const isLoaded = typeof loadedCount !== "undefined" ? loadedCount : (window.loadedCount || 0);
+    const requiredCount = typeof sceneUsedCount === "function" ? sceneUsedCount() : 0;
+    if ((typeof sceneIsStill === "function" && sceneIsStill()) || isLoaded < requiredCount) return; // nothing to drag on a still scene
     if (!canDragFrame(event)) return;
 
     const point = event.touches ? event.touches[0] : event;

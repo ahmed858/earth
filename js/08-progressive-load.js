@@ -3,6 +3,9 @@
 ========================================================= */
 
 const HIRES_CONCURRENT = 4;           // max simultaneous background hi-res fetches
+if (typeof frameImages === "undefined") {
+    var frameImages = [];
+}
 
 // These point at the ACTIVE scene's cache (swapped by activateSceneFrameCache).
 let hiresLoaded = new Array(TOTAL_FRAMES).fill(false);

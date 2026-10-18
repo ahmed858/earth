@@ -48,8 +48,9 @@ let currentScene = "exterior";
 let sceneToken = 0; // bumped on every scene switch to cancel stale image loads
 
 /* These point at the active scene and change as you switch floors. */
-let IMAGE_FOLDER = `${STORAGE_PUBLIC_BASE}/${SCENES.exterior.path}/high`;
-let LOWRES_FOLDER = `${STORAGE_PUBLIC_BASE}/${SCENES.exterior.path}/low`;
+const exteriorPath = (SCENES.exterior && SCENES.exterior.path) || "exterior/day";
+let IMAGE_FOLDER = `${STORAGE_PUBLIC_BASE}/${exteriorPath}/high`;
+let LOWRES_FOLDER = `${STORAGE_PUBLIC_BASE}/${exteriorPath}/low`;
 // Frames are served with a one-year cache. Bump FRAMES_VERSION in
 // config.js whenever the renders in the bucket are replaced, so browsers
 // that cached the old orbit fetch the new one.
@@ -58,8 +59,9 @@ const FRAME_QS = MZ.FRAMES_VERSION ? `?v=${encodeURIComponent(MZ.FRAMES_VERSION)
 const BUTTON_STEP = 10;
 const ANIMATION_SPEED = 35;
 
-let frameImages = []; // points at the active scene's cache (see sceneFrameCache)
+var frameImages = []; // points at the active scene's cache (see sceneFrameCache)
 let loadedCount = 0;
+window.loadedCount = loadedCount;
 let currentFrame = 0;
 
 let isAnimating = false;
